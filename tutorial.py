@@ -31,7 +31,7 @@ def display_images(image_data):
                 response.raise_for_status()  # Raise an error for bad responses (4xx, 5xx)
                 image = Image.open(BytesIO(response.content))
                 with cols[idx % 4]:  # Cycle through columns
-                    st.image(image, caption=f"{section}{idx + 1:03}", use_column_width=True)
+                    st.image(image, caption=f"{section}{idx + 1:03}", use_container_width=True)  # Updated parameter
                     if st.button(f"Open {section}{idx + 1:03}", key=f"{section}_{idx}"):
                         webbrowser.open_new_tab(url)
             except Exception as e:
