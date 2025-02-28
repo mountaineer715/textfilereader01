@@ -31,9 +31,9 @@ def display_images(image_data):
                 response.raise_for_status()  # Raise an error for bad responses (4xx, 5xx)
                 image = Image.open(BytesIO(response.content))
                 with cols[idx % 4]:  # Cycle through columns
-                    st.image(image, caption=f"{section}{idx + 1:03}", use_container_width=True)  # Updated parameter
-                    if st.button(f"Open {section}{idx + 1:03}", key=f"{section}_{idx}"):
-                        webbrowser.open_new_tab(url)
+                    st.image(image, caption=f"{section}{idx + 1:03}", use_container_width=True)
+                    # Use st.markdown to create a link that opens in a new tab
+                    st.markdown(f'<a href="{url}" target="_blank">Open {section}{idx + 1:03}</a>', unsafe_allow_html=True)
             except Exception as e:
                 st.error(f"Failed to load image from {url}: {e}")
 
@@ -49,8 +49,8 @@ def display_videos(video_data):
             with cols[idx % 4]:  # Cycle through columns
                 # Display a placeholder for the video
                 st.write(f"🎥 {section}{idx + 1:03}")
-                if st.button(f"Open {section}{idx + 1:03}", key=f"{section}_{idx}"):
-                    webbrowser.open_new_tab(url)
+                # Use st.markdown to create a link that opens in a new tab
+                st.markdown(f'<a href="{url}" target="_blank">Open {section}{idx + 1:03}</a>', unsafe_allow_html=True)
 
 # Function to process the uploaded file
 def process_file(file_content, selected_base_url, is_image):
