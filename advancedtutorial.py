@@ -1,5 +1,4 @@
 import streamlit as st
-from base_urls import IMAGE_BASE_URLS, VIDEO_BASE_URLS, fetch_image_with_fallback
 from PIL import Image
 import requests
 from io import BytesIO
@@ -15,10 +14,10 @@ def import_base_urls_from_file(file_path):
     module = importlib.util.module_from_spec(spec)
     sys.modules[module_name] = module
     spec.loader.exec_module(module)
-    return module.IMAGE_BASE_URLS, module.VIDEO_BASE_URLS
+    return module.IMAGE_BASE_URLS, module.VIDEO_BASE_URLS, module.fetch_image_with_fallback
 
 # Function to fetch and display images
-def display_images(image_data):
+def display_images(image_data, fetch_image_with_fallback):
     # Sort sections alphabetically
     sorted_sections = sorted(image_data.keys())
     
@@ -55,7 +54,7 @@ def display_videos(video_data):
                 st.markdown(f'<a href="{url}" target="_blank">Open {section}{idx + 1:03}</a>', unsafe_allow_html=True)
 
 # Function to process the uploaded file
-def process_file(file_content, selected_base_url, is_image):
+def process_file(file_content, selected_base_url, is_image, fetch_image_with_fallback):
     # Read the file line by line
     lines = file_content.splitlines()
     data = {}  # Dictionary to store sections and their content
@@ -88,7 +87,7 @@ def process_file(file_content, selected_base_url, is_image):
     
     # Display the content based on whether it's images or videos
     if is_image:
-        display_images(data)
+        display_images(data, fetch_image_with_fallback)
     else:
         display_videos(data)
 
@@ -111,9 +110,9 @@ def main():
         with open("temp_base_urls.py", "wb") as f:
             f.write(uploaded_py_file.getbuffer())
 
-        # Import the base URLs from the uploaded file
+        # Import the base URLs and fetch_image_with_fallback function from the uploaded file
         try:
-            IMAGE_BASE_URLS, VIDEO_BASE_URLS = import_base_urls_from_file("temp_base_urls.py")
+            IMAGE_BASE_URLS, VIDEO_BASE_URLS, fetch_image_with_fallback = import_base_urls_from_file("temp_base_urls.py")
             
             # Radio button to choose between images and videos
             content_type = st.radio("Select content type", ["Images", "Videos"])
@@ -144,7 +143,7 @@ def main():
                 
                 # Reprocess the file if its content changes
                 if "file_content" in st.session_state:
-                    process_file(st.session_state.file_content, selected_base_url, content_type == "Images")
+                    process_file(st.session_state.file_content, selected_base_url, content_type == "Images", fetch_image_with_fallback)
 
         except Exception as e:
             st.error(f"Failed to import base URLs from the uploaded file: {e}")
