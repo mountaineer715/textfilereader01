@@ -17,7 +17,7 @@ def import_base_urls_from_file(file_path):
     return module.IMAGE_BASE_URLS, module.VIDEO_BASE_URLS, module.fetch_image_with_fallback
 
 # Function to fetch and display images
-def display_images(image_data, fetch_image_with_fallback):
+def display_images(image_data, fetch_image_with_fallback, selected_base_urls):
     # Sort sections alphabetically
     sorted_sections = sorted(image_data.keys())
     
@@ -26,20 +26,23 @@ def display_images(image_data, fetch_image_with_fallback):
         cols = st.columns(4)  # Display 4 images per row
         for idx, (name, url) in enumerate(image_data[section]):
             with cols[idx % 4]:  # Cycle through columns
-                try:
-                    # Fetch the image with fallback servers
-                    image, new_url = fetch_image_with_fallback(url)
-                    if image:
-                        st.image(image, caption=f"{section}{idx + 1:03}", use_container_width=True)
-                        # Use st.markdown to create a link that opens in a new tab
-                        st.markdown(f'<a href="{new_url}" target="_blank">Open {section}{idx + 1:03}</a>', unsafe_allow_html=True)
-                    else:
-                        st.error(f"Failed to load image from all servers for {section}{idx + 1:03}")
-                except Exception as e:
-                    st.error(f"Failed to process image from {url}: {e}")
+                for base_url in selected_base_urls:
+                    try:
+                        # Fetch the image with fallback servers
+                        image, new_url = fetch_image_with_fallback(url, base_url)
+                        if image:
+                            # Create a clean caption and link name
+                            caption = f"{section}_{idx + 1:03}"
+                            st.image(image, caption=caption, use_column_width=True)
+                            # Use st.markdown to create a link that opens in a new tab
+                            st.markdown(f'<a href="{new_url}" target="_blank">Open {caption}</a>', unsafe_allow_html=True)
+                            break  # Stop trying other base URLs if one succeeds
+                    except Exception:
+                        # Silently handle failures (no error message displayed)
+                        continue
 
 # Function to display videos
-def display_videos(video_data):
+def display_videos(video_data, selected_base_urls):
     # Sort sections alphabetically
     sorted_sections = sorted(video_data.keys())
     
@@ -48,13 +51,22 @@ def display_videos(video_data):
         cols = st.columns(4)  # Display 4 videos per row
         for idx, (name, url) in enumerate(video_data[section]):
             with cols[idx % 4]:  # Cycle through columns
-                # Display a placeholder for the video
-                st.write(f"🎥 {section}{idx + 1:03}")
-                # Use st.markdown to create a link that opens in a new tab
-                st.markdown(f'<a href="{url}" target="_blank">Open {section}{idx + 1:03}</a>', unsafe_allow_html=True)
-
+                for base_url in selected_base_urls:
+                    try:
+                        # Construct the video URL
+                        video_url = base_url.format(url.replace(' ', '+'))
+                        # Create a clean caption and link name
+                        caption = f"{section}_{idx + 1:03}"
+                        st.write(f"🎥 {caption}")
+                        # Use st.markdown to create a link that opens in a new tab
+                        st.markdown(f'<a href="{video_url}" target="_blank">Open {caption}</a>', unsafe_allow_html=True)
+                        break  # Stop trying other base URLs if one succeeds
+                    except Exception:
+                        # Silently handle failures (no error message displayed)
+                        continue
+                        
 # Function to process the uploaded file
-def process_file(file_content, selected_base_url, is_image, fetch_image_with_fallback):
+def process_file(file_content, selected_base_urls, is_image, fetch_image_with_fallback):
     # Read the file line by line
     lines = file_content.splitlines()
     data = {}  # Dictionary to store sections and their content
@@ -76,20 +88,20 @@ def process_file(file_content, selected_base_url, is_image, fetch_image_with_fal
                 st.warning("Content without a section will be ignored. Add a section using #.")
                 continue
             
-            # Remove words followed by # in the line (if any)
-            cleaned_line = ' '.join([word for word in line.split() if not word.endswith('#')])
-            
-            # Construct the link using the selected base URL and the cleaned line as the keyphrase
-            search_url = selected_base_url.format(cleaned_line.replace(' ', '+'))
+            # Extract the part after # (if any) for the caption
+            if '#' in line:
+                name = line.split('#')[1].strip()  # Use the part after # as the name
+            else:
+                name = line.strip()  # Use the entire line as the name if no # is present
             
             # Add the content to the current section
-            data[current_section].append((cleaned_line, search_url))
+            data[current_section].append((name, line.strip()))
     
     # Display the content based on whether it's images or videos
     if is_image:
-        display_images(data, fetch_image_with_fallback)
+        display_images(data, fetch_image_with_fallback, selected_base_urls)
     else:
-        display_videos(data)
+        display_videos(data, selected_base_urls)
 
 # Function to compute a hash of the file content
 def compute_file_hash(file_content):
@@ -117,13 +129,13 @@ def main():
             # Radio button to choose between images and videos
             content_type = st.radio("Select content type", ["Images", "Videos"])
 
-            # Dropdown to select the base URL
+            # Multi-select dropdown to select the base URLs
             if content_type == "Images":
-                selected_base_url_key = st.selectbox("Select an image base URL", list(IMAGE_BASE_URLS.keys()))
-                selected_base_url = IMAGE_BASE_URLS[selected_base_url_key]
+                selected_base_url_keys = st.multiselect("Select image base URLs", list(IMAGE_BASE_URLS.keys()))
+                selected_base_urls = [IMAGE_BASE_URLS[key] for key in selected_base_url_keys]
             else:
-                selected_base_url_key = st.selectbox("Select a video base URL", list(VIDEO_BASE_URLS.keys()))
-                selected_base_url = VIDEO_BASE_URLS[selected_base_url_key]
+                selected_base_url_keys = st.multiselect("Select video base URLs", list(VIDEO_BASE_URLS.keys()))
+                selected_base_urls = [VIDEO_BASE_URLS[key] for key in selected_base_url_keys]
 
             # File uploader for the text file
             uploaded_txt_file = st.file_uploader("Choose a text file", type=["txt"])
@@ -143,7 +155,7 @@ def main():
                 
                 # Reprocess the file if its content changes
                 if "file_content" in st.session_state:
-                    process_file(st.session_state.file_content, selected_base_url, content_type == "Images", fetch_image_with_fallback)
+                    process_file(st.session_state.file_content, selected_base_urls, content_type == "Images", fetch_image_with_fallback)
 
         except Exception as e:
             st.error(f"Failed to import base URLs from the uploaded file: {e}")
